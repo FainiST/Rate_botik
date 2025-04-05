@@ -22,13 +22,13 @@ class UserState(StatesGroup):
     effectiveness = State()
     satisfaction = State()
 
-# Подключение к базе данных
 def get_db_connection():
-    return sqlite3.connect('feedback_bot.db')
+    return sqlite3.connect('fback.db')
 
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute('''INSERT INTO employees (full_name) VALUES ('Лейтер Григорий Александрович');''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,19 +60,26 @@ def init_db():
 init_db()
 
 def m_menu():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("Оценить встречу"))
+    markup = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Оценить встречу")]],
+        resize_keyboard=True
+    )
     return markup
 
-# Подтверждение/редактирование
 def editconfirm():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(KeyboardButton("Подтвердить"), KeyboardButton("Редактировать"))
+    markup = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Подтвердить"), KeyboardButton(text="Редактировать")]
+        ],
+        resize_keyboard=True
+    )
     return markup
 
 def ratemenu():
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(*[KeyboardButton(str(i)) for i in range(1, 6)])
+    markup = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=str(i)) for i in range(1, 6)]],
+        resize_keyboard=True
+    )
     return markup
 
 @dp.message(Command("start"))
