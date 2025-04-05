@@ -1,16 +1,28 @@
 import asyncio
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import Message
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 import sqlite3
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 TOKEN = "7204847095:AAEIAmuJV8vqC8J5XepRVPQRmdmTUePVuYU"
 
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
+bot = Bot(token=TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot=bot, storage=storage)
 
+# Состояния для FSM (Finite State Machine)
+class UserState(StatesGroup):
+    waiting_for_full_name = State()
+    editing_full_name = State()
+    meeting_title = State()
+    meeting_datetime = State()
+    effectiveness = State()
+    satisfaction = State()
+
+# Подключение к базе данных
 def get_db_connection():
     return sqlite3.connect('feedback_bot.db')
 
@@ -47,10 +59,95 @@ def init_db():
 
 init_db()
 
+def m_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("Оценить встречу"))
+    return markup
+
+# Подтверждение/редактирование
+def editconfirm():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("Подтвердить"), KeyboardButton("Редактировать"))
+    return markup
+
+def ratemenu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(*[KeyboardButton(str(i)) for i in range(1, 6)])
+    return markup
 
 @dp.message(Command("start"))
-async def start_handler(message: Message) -> None:
-    await bot.send_message("Привет!")
+async def send_welcome(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT full_name FROM employees WHERE telegram_id = ?", (user_id,))
+    employee = cursor.fetchone()
+    conn.close()
+
+    if employee:
+        await message.answer("Добро пожаловать!", reply_markup=m_menu())
+    else:
+        await message.answer("Пожалуйста, введите свои ФИО:")
+        await state.set_state(UserState.waiting_for_full_name)
+
+@dp.message(StateFilter(UserState.waiting_for_full_name))
+async def process_full_name(message: types.Message, state: FSMContext):
+    full_name = message.text.strip()
+    user_id = message.from_user.id
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM employees WHERE full_name = ?", (full_name,))
+    employee = cursor.fetchone()
+
+    if employee:
+        cursor.execute("UPDATE employees SET telegram_id = ? WHERE id = ?", (user_id, employee[0]))
+        conn.commit()
+        conn.close()
+        await message.answer("Добро пожаловать!", reply_markup=m_menu())
+        await state.finish()
+    else:
+        conn.close()
+        await message.answer("Сотрудник не найден. Введите ФИО повторно или свяжитесь с администратором.")
+        await state.set_state(UserState.waiting_for_full_name)
+
+@dp.message(lambda message: message.text == "Оценить встречу")
+async def handle_menu(message: types.Message, state: FSMContext):
+    await start_meeting_feedback(message, state)
+
+async def start_meeting_feedback(message: types.Message, state: FSMContext):
+    await message.answer("Введите название встречи:")
+    await state.set_state(UserState.meeting_title)
+
+@dp.message(StateFilter(UserState.meeting_title))
+async def process_meeting_title(message: types.Message, state: FSMContext):
+    await state.update_data(title=message.text.strip())
+    await message.answer(f"Название встречи: {message.text}", reply_markup=editconfirm())
+    await state.set_state(UserState.meeting_datetime)
+
+@dp.message(StateFilter(UserState.meeting_datetime))
+async def process_meeting_datetime_or_confirm(message: types.Message, state: FSMContext):
+    if message.text == "Подтвердить":
+        await message.answer("Введите дату и время начала:")
+    elif message.text == "Редактировать":
+        await message.answer("Введите название встречи:")
+        await state.set_state(UserState.meeting_title)
+    else:
+        await state.update_data(datetime=message.text.strip())
+        await message.answer(f"Дата и время: {message.text}", reply_markup=editconfirm())
+        await state.set_state(UserState.effectiveness)
+
+@dp.message(StateFilter(UserState.effectiveness))
+async def process_effectiveness_or_confirm(message: types.Message, state: FSMContext):
+    if message.text == "Подтвердить":
+        await message.answer("Пожалуйста, оцените результативность встречи (от 1 до 5):", reply_markup=ratemenu())
+    elif message.text == "Редактировать":
+        await message.answer("Введите дату:")
+        await state.set_state(UserState.meeting_datetime)
+    else:
+        await state.update_data(effectiveness=int(message.text))
+        await message.answer("Пожалуйста, оцените Вашу эмоциональную удовлетворённость (от 1 до 5):", reply_markup=ratemenu())
+        await state.set_state(UserState.satisfaction)
 
 async def main():
     try:
