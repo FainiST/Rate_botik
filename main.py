@@ -115,7 +115,7 @@ async def process_full_name(message: types.Message, state: FSMContext):
         await state.finish()
     else:
         conn.close()
-        await message.answer("Сотрудник не найден. Введите ФИО повторно или свяжитесь с администратором.")
+        await message.answer("Сотрудник не найден")
         await state.set_state(UserState.waiting_for_full_name)
 
 @dp.message(lambda message: message.text == "Оценить встречу")
@@ -123,7 +123,7 @@ async def handle_menu(message: types.Message, state: FSMContext):
     await start_meeting_feedback(message, state)
 
 async def start_meeting_feedback(message: types.Message, state: FSMContext):
-    await message.answer("Введите название встречи:")
+    await message.answer("введите название встречи:")
     await state.set_state(UserState.meeting_title)
 
 @dp.message(StateFilter(UserState.meeting_title))
