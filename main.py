@@ -27,7 +27,6 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''INSERT IF NOT EXISTS INTO employees (full_name) VALUES ('Лейтер Григорий Александрович');''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +85,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT FIO FROM employees WHERE t_id = ?", (user_id,))
+    cursor.execute("SELECT full_name FROM employees WHERE t_id = ?", (user_id,))
     employee = cursor.fetchone()
     conn.close()
 
@@ -94,9 +93,9 @@ async def send_welcome(message: types.Message, state: FSMContext):
         await message.answer("Добро пожаловать!", reply_markup=m_menu())
     else:
         await message.answer("Пожалуйста, введите свои ФИО:")
-        await state.set_state(UserState.waiting_for_FIO)
+        await state.set_state(UserState.waiting_for_full_name)
 
-@dp.message(StateFilter(UserState.waiting_for_FIO))
+@dp.message(StateFilter(UserState.waiting_for_full_name))
 async def process_full_name(message: types.Message, state: FSMContext):
     full_name = message.text.strip()
     user_id = message.from_user.id
@@ -154,6 +153,32 @@ async def process_effectiveness_or_confirm(message: types.Message, state: FSMCon
         await state.update_data(effectiveness=int(message.text))
         await message.answer("Дайте оценку вашей эмоциональной удовлетворённости (от 1 до 5):", reply_markup=ratemenu())
         await state.set_state(UserState.satisfaction)
+
+@dp.message(StateFilter(UserState.satisfaction))
+async def process_satisfaction(message: types.Message, state: FSMContext):
+    await state.update_data(satisfaction=int(message.text))
+    await save_fbavk(message, state)
+    await message.answer("Благодарю, ваши ответы сохранены :3", reply_markup=m_menu())
+    await state.finish()
+
+async def save_fbavk(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    data = await state.get_data()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("INSERT INTO meets (title, date_time) VALUES (?, ?)", (data['title'], data['datetime']))
+    meeting_id = cursor.lastrowid
+    
+    cursor.execute("SELECT id FROM employees WHERE t_id = ?", (user_id,))
+    employee_id = cursor.fetchone()[0]
+    
+    cursor.execute("INSERT INTO fback (employee_id, meeting_id, effectiveness, satisfaction) VALUES (?, ?, ?, ?)",
+                (employee_id, meeting_id, data['effectiveness'], data['satisfaction']))
+    
+    conn.commit()
+    conn.close()
 
 async def main():
     try:
