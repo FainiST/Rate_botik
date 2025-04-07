@@ -27,23 +27,23 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''INSERT INTO employees (full_name) VALUES ('Лейтер Григорий Александрович');''')
+    cursor.execute('''INSERT IF NOT EXISTS INTO employees (full_name) VALUES ('Лейтер Григорий Александрович');''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT NOT NULL,
-            telegram_id INTEGER UNIQUE
+            t_id INTEGER UNIQUE
         )
     ''')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS meetings (
+        CREATE TABLE IF NOT EXISTS meets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             date_time TEXT NOT NULL
         )
     ''')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS feedback (
+        CREATE TABLE IF NOT EXISTS fback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             employee_id INTEGER,
             meeting_id INTEGER,
@@ -86,7 +86,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT full_name FROM employees WHERE telegram_id = ?", (user_id,))
+    cursor.execute("SELECT FIO FROM employees WHERE t_id = ?", (user_id,))
     employee = cursor.fetchone()
     conn.close()
 
@@ -94,9 +94,9 @@ async def send_welcome(message: types.Message, state: FSMContext):
         await message.answer("Добро пожаловать!", reply_markup=m_menu())
     else:
         await message.answer("Пожалуйста, введите свои ФИО:")
-        await state.set_state(UserState.waiting_for_full_name)
+        await state.set_state(UserState.waiting_for_FIO)
 
-@dp.message(StateFilter(UserState.waiting_for_full_name))
+@dp.message(StateFilter(UserState.waiting_for_FIO))
 async def process_full_name(message: types.Message, state: FSMContext):
     full_name = message.text.strip()
     user_id = message.from_user.id
@@ -107,7 +107,7 @@ async def process_full_name(message: types.Message, state: FSMContext):
     employee = cursor.fetchone()
 
     if employee:
-        cursor.execute("UPDATE employees SET telegram_id = ? WHERE id = ?", (user_id, employee[0]))
+        cursor.execute("UPDATE employees SET t_id = ? WHERE id = ?", (user_id, employee[0]))
         conn.commit()
         conn.close()
         await message.answer("Добро пожаловать!", reply_markup=m_menu())
