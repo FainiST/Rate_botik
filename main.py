@@ -13,7 +13,6 @@ bot = Bot(token=TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot=bot, storage=storage)
 
-# Состояния для FSM (Finite State Machine)
 class UserState(StatesGroup):
     waiting_for_full_name = State()
     editing_full_name = State()
@@ -44,7 +43,7 @@ def init_db():
         )
     ''')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS feedbacks (
+        CREATE TABLE IF NOT EXISTS feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             employee_id INTEGER,
             meeting_id INTEGER,
@@ -153,15 +152,15 @@ async def process_effectiveness_or_confirm(message: types.Message, state: FSMCon
         await state.set_state(UserState.meeting_datetime)
     else:
         await state.update_data(effectiveness=int(message.text))
-        await message.answer("Пожалуйста, оцените Вашу эмоциональную удовлетворённость (от 1 до 5):", reply_markup=ratemenu())
+        await message.answer("Дайте оценку вашей эмоциональной удовлетворённости (от 1 до 5):", reply_markup=ratemenu())
         await state.set_state(UserState.satisfaction)
 
 async def main():
     try:
         print("Бот запущен!")
         await dp.start_polling(bot)
-    except Exception as e:
-        print(f"Произошла ошибка: {e}")
+    except Exception as oshibka:
+        print(f"Произошла ошибка: {oshibka}")
     finally:
         await bot.session.close()
 
