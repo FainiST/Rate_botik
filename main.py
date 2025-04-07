@@ -110,7 +110,7 @@ async def process_full_name(message: types.Message, state: FSMContext):
         conn.commit()
         conn.close()
         await message.answer("Добро пожаловать!", reply_markup=m_menu())
-        await state.finish()
+        await state.clear()
     else:
         conn.close()
         await message.answer("Сотрудник не найден")
@@ -159,7 +159,7 @@ async def process_satisfaction(message: types.Message, state: FSMContext):
     await state.update_data(satisfaction=int(message.text))
     await save_fbavk(message, state)
     await message.answer("Благодарю, ваши ответы сохранены :3", reply_markup=m_menu())
-    await state.finish()
+    await state.clear()
 
 async def save_fbavk(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
