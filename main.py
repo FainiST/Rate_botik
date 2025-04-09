@@ -28,9 +28,9 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employees (
+        CREATE TABLE IF NOT EXISTS empls (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
+            fio TEXT NOT NULL,
             t_id INTEGER UNIQUE
         )
     ''')
@@ -38,18 +38,18 @@ def init_db():
         CREATE TABLE IF NOT EXISTS meets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
-            date_time TEXT NOT NULL
+            d_time TEXT NOT NULL
         )
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS fback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER,
-            meeting_id INTEGER,
+            empl_id INTEGER,
+            meet_id INTEGER,
             effectiveness INTEGER,
             satisfaction INTEGER,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (meeting_id) REFERENCES meetings(id)
+            FOREIGN KEY (empl_id) REFERENCES empls(id),
+            FOREIGN KEY (meet_id) REFERENCES meets(id)
         )
     ''')
     conn.commit()
@@ -85,7 +85,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT full_name FROM employees WHERE t_id = ?", (user_id,))
+    cursor.execute("SELECT fio FROM empls WHERE t_id = ?", (user_id,))
     employee = cursor.fetchone()
     conn.close()
 
@@ -102,11 +102,11 @@ async def process_full_name(message: types.Message, state: FSMContext):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM employees WHERE full_name = ?", (full_name,))
+    cursor.execute("SELECT id FROM empls WHERE fio = ?", (full_name,))
     employee = cursor.fetchone()
 
     if employee:
-        cursor.execute("UPDATE employees SET t_id = ? WHERE id = ?", (user_id, employee[0]))
+        cursor.execute("UPDATE empls SET t_id = ? WHERE id = ?", (user_id, employee[0]))
         conn.commit()
         conn.close()
         await message.answer("Добро пожаловать!", reply_markup=m_menu())
@@ -168,14 +168,14 @@ async def save_fbavk(message: types.Message, state: FSMContext):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("INSERT INTO meets (title, date_time) VALUES (?, ?)", (data['title'], data['datetime']))
+    cursor.execute("INSERT INTO meets (title, d_time) VALUES (?, ?)", (data['title'], data['datetime']))
     meeting_id = cursor.lastrowid
     
-    cursor.execute("SELECT id FROM employees WHERE t_id = ?", (user_id,))
-    employee_id = cursor.fetchone()[0]
+    cursor.execute("SELECT id FROM empls WHERE t_id = ?", (user_id,))
+    empl_id = cursor.fetchone()[0]
     
-    cursor.execute("INSERT INTO fback (employee_id, meeting_id, effectiveness, satisfaction) VALUES (?, ?, ?, ?)",
-                (employee_id, meeting_id, data['effectiveness'], data['satisfaction']))
+    cursor.execute("INSERT INTO fback (empl_id, meet_id, effectiveness, satisfaction) VALUES (?, ?, ?, ?)",
+                (empl_id, meeting_id, data['effectiveness'], data['satisfaction']))
     
     conn.commit()
     conn.close()
