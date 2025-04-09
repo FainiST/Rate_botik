@@ -7,11 +7,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-TOKEN = "7204847095:AAEIAmuJV8vqC8J5XepRVPQRmdmTUePVuYU"
+token_b = ""
 
-bot = Bot(token=TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(bot=bot, storage=storage)
+bot = Bot(token=token_b)
+storag = MemoryStorage()
+dp = Dispatcher(bot=bot, storage=storag)
 
 class UserState(StatesGroup):
     waiting_for_full_name = State()
